@@ -8,6 +8,7 @@ import com.bibitdev.storyapps.model.DataStory
 import com.bumptech.glide.Glide
 
 class DetailActivity : AppCompatActivity() {
+
     private lateinit var binding: ActivityDetailBinding
 
     @Suppress("DEPRECATION")
@@ -31,4 +32,9 @@ class DetailActivity : AppCompatActivity() {
                 .into(ivDetail)
         }
     }
+
+    companion object {
+        const val STORY_KEY = "story"
+    }
 }
+

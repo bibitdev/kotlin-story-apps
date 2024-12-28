@@ -36,4 +36,9 @@
     <string name="nama">Nama</string>
     <string name="sudah_punya_akun">Sudah punya akun?</string>
     <string name="description">description</string>
+    <string name="title_activity_maps">MapsActivity</string>
+    <string name="maps">maps</string>
+    <string name="retry">Retry</string>
+    <string name="went_some_wrong">Went some wrong</string>
+    <string name="share_my_location">Share my location ?  </string>
 </resources>

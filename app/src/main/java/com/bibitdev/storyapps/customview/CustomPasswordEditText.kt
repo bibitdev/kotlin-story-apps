@@ -10,6 +10,7 @@ import android.view.MotionEvent
 import android.view.View
 import androidx.appcompat.widget.AppCompatEditText
 import androidx.core.content.ContextCompat
+import androidx.core.widget.addTextChangedListener
 import com.bibitdev.storyapps.R
 
 class CustomPasswordEditText : AppCompatEditText, View.OnTouchListener {
@@ -45,15 +46,9 @@ class CustomPasswordEditText : AppCompatEditText, View.OnTouchListener {
         background = ContextCompat.getDrawable(context, R.drawable.input_desc)
         transformationMethod = PasswordTransformationMethod.getInstance()
 
-        addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                validatePassword()
-            }
-
-            override fun afterTextChanged(s: Editable?) {}
-        })
+        addTextChangedListener { s ->
+            validatePassword()
+        }
     }
 
     override fun onTouch(v: View?, event: MotionEvent): Boolean {

@@ -1,14 +1,19 @@
 package com.bibitdev.storyapps.repository
 
-import android.util.Log
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
 import com.bibitdev.storyapps.api.ApiService
+import com.bibitdev.storyapps.model.DataStory
 import com.bibitdev.storyapps.model.LoginResponse
 import com.bibitdev.storyapps.model.Response
 import com.bibitdev.storyapps.model.StoriesResponse
+import com.bibitdev.storyapps.paging.PagingStory
+import kotlinx.coroutines.flow.Flow
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 
-class UserRepository(private val apiService: ApiService) {
+open class UserRepository(private val apiService: ApiService) {
 
     suspend fun register(name: String, email: String, password: String): Response {
         return safeApiCall {
@@ -22,13 +27,6 @@ class UserRepository(private val apiService: ApiService) {
         }
     }
 
-
-    suspend fun getStories(token: String): StoriesResponse {
-        return safeApiCall {
-            apiService.getStories("Bearer $token")
-        }
-    }
-
     suspend fun uploadStory(
         token: String,
         file: MultipartBody.Part,
@@ -39,11 +37,30 @@ class UserRepository(private val apiService: ApiService) {
         }
     }
 
+    fun getStoriesPaging(token: String): Flow<PagingData<DataStory>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = 3,
+                initialLoadSize = 3,
+                enablePlaceholders = true
+            ),
+            pagingSourceFactory = { PagingStory(apiService, token) }
+        ).flow
+    }
+
+    suspend fun getStoriesWithLocation(token: String): StoriesResponse {
+        return safeApiCall {
+            apiService.getStoriesWithLocation(
+                token = token,
+                location = 1,
+            )
+        }
+    }
+
     private suspend fun <T> safeApiCall(apiCall: suspend () -> T): T {
         return try {
             apiCall()
         } catch (e: Exception) {
-            Log.e("Register", "API call failed: ${e.message}")
             throw Exception("API call failed: ${e.message}")
         }
     }

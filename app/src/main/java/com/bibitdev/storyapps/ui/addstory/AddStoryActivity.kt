@@ -3,6 +3,7 @@ package com.bibitdev.storyapps.ui.addstory
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -21,6 +22,8 @@ import com.bibitdev.storyapps.ui.ViewModelFactory
 import com.bibitdev.storyapps.ui.home.HomeActivity
 import com.bibitdev.storyapps.utils.PreferencesHelper
 import com.bibitdev.storyapps.utils.StorageHelper
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.google.android.material.snackbar.Snackbar
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
@@ -34,6 +37,8 @@ class AddStoryActivity : AppCompatActivity() {
     private lateinit var cameraIntentLauncher: ActivityResultLauncher<Intent>
     private lateinit var galleryIntentLauncher: ActivityResultLauncher<String>
     private lateinit var photoFilePath: String
+    private var currentLocation: Location? = null
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     private val addStoryViewModel: AddStoryViewModel by viewModels {
         ViewModelFactory(UserRepository(ApiConfig.apiService))
@@ -45,22 +50,27 @@ class AddStoryActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         preferencesHelper = PreferencesHelper(this)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
         setupIntents()
         setupActions()
         setupObservers()
+        setupShareLocation()
+
     }
 
     private fun setupIntents() {
-        cameraIntentLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == RESULT_OK) {
-                handleCameraResult()
+        cameraIntentLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                if (result.resultCode == RESULT_OK) {
+                    handleCameraResult()
+                }
             }
-        }
 
-        galleryIntentLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            uri?.let { handleGalleryResult(it) }
-        }
+        galleryIntentLauncher =
+            registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+                uri?.let { handleGalleryResult(it) }
+            }
     }
 
     private fun handleCameraResult() {
@@ -100,14 +110,19 @@ class AddStoryActivity : AppCompatActivity() {
         selectedFile?.let {
             uploadStory(description)
         } ?: run {
-            Snackbar.make(binding.root, getString(R.string.filerequired), Snackbar.LENGTH_SHORT).show()
+            Snackbar.make(binding.root, getString(R.string.filerequired), Snackbar.LENGTH_SHORT)
+                .show()
         }
     }
 
     private fun uploadStory(description: String) {
         val storageHelper = StorageHelper.generateTempFile(selectedFile!!)
         val descriptionBody = description.toRequestBody()
-        val filePart = MultipartBody.Part.createFormData("photo", storageHelper.name, storageHelper.asRequestBody())
+        val filePart = MultipartBody.Part.createFormData(
+            "photo",
+            storageHelper.name,
+            storageHelper.asRequestBody()
+        )
 
         addStoryViewModel.uploadStory(
             preferencesHelper.loadUser()?.token.orEmpty(),
@@ -144,14 +159,21 @@ class AddStoryActivity : AppCompatActivity() {
     }
 
     private fun checkCameraPermission(): Boolean {
-        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun requestCameraPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
             showPermissionRationaleDialog()
         } else {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), REQUEST_CODE_CAMERA_PERMISSION)
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                REQUEST_CODE_CAMERA_PERMISSION
+            )
         }
     }
 
@@ -159,8 +181,13 @@ class AddStoryActivity : AppCompatActivity() {
         androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("Izin Kamera Dibutuhkan")
             .setMessage("Aplikasi ini membutuhkan izin untuk mengakses kamera.")
-            .setPositiveButton("Berikan") { _, _ -> ActivityCompat.requestPermissions(this, arrayOf(
-                Manifest.permission.CAMERA), REQUEST_CODE_CAMERA_PERMISSION) }
+            .setPositiveButton("Berikan") { _, _ ->
+                ActivityCompat.requestPermissions(
+                    this, arrayOf(
+                        Manifest.permission.CAMERA
+                    ), REQUEST_CODE_CAMERA_PERMISSION
+                )
+            }
             .setNegativeButton("Batal") { dialog, _ -> dialog.dismiss() }
             .show()
     }
@@ -169,12 +196,20 @@ class AddStoryActivity : AppCompatActivity() {
         val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
         val storage = StorageHelper.createTempFile(this)
         photoFilePath = storage.absolutePath
-        val uri = FileProvider.getUriForFile(this, "${applicationContext.packageName}.fileprovider", storage)
+        val uri = FileProvider.getUriForFile(
+            this,
+            "${applicationContext.packageName}.fileprovider",
+            storage
+        )
         intent.putExtra(MediaStore.EXTRA_OUTPUT, uri)
         cameraIntentLauncher.launch(intent)
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_CODE_CAMERA_PERMISSION) {
             if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
@@ -183,6 +218,65 @@ class AddStoryActivity : AppCompatActivity() {
             } else {
                 Snackbar.make(binding.root, "Izin kamera ditolak.", Snackbar.LENGTH_LONG).show()
             }
+        }
+    }
+
+    private fun setupShareLocation() {
+        binding.btnSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked) {
+                getLocation()
+            } else {
+                currentLocation = null
+            }
+        }
+    }
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+            when {
+                permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false -> {
+                    getLocation()
+                }
+
+                permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false -> {
+                    getLocation()
+                }
+
+                else -> {
+                    binding.btnSwitch.isChecked = false
+
+                }
+            }
+        }
+
+    private fun checkPermission(permission: String): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            permission
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun getLocation() {
+        if (checkPermission(Manifest.permission.ACCESS_FINE_LOCATION) &&
+            checkPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+        ) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+                if (location != null) {
+                    currentLocation = location
+
+                } else {
+                    binding.btnSwitch.isChecked = false
+                }
+            }
+        } else {
+            requestPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
         }
     }
 

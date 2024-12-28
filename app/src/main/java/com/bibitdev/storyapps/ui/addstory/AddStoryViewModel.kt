@@ -17,7 +17,10 @@ class AddStoryViewModel(private val repository: UserRepository) : ViewModel() {
     private val upResult = MutableLiveData<Response>()
     val uploadResult: LiveData<Response> get() = upResult
 
-    fun uploadStory(token: String, file: MultipartBody.Part, description: RequestBody) {
+    fun uploadStory(
+        token: String, file: MultipartBody.Part, description: RequestBody, lat: Double? = null,
+        lon: Double? = null
+    ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 Log.d("AddStoryViewModel", "Meng-upload story dengan token: $token")

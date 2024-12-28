@@ -4,26 +4,18 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.bibitdev.storyapps.model.StoriesResponse
+import androidx.paging.PagingData
+import androidx.paging.cachedIn
+import com.bibitdev.storyapps.model.DataStory
 import com.bibitdev.storyapps.repository.UserRepository
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.Flow
 
-class HomeViewModel (private val repository: UserRepository) : ViewModel() {
-
-    private val storiesList = MutableLiveData<StoriesResponse>()
-    val stories: LiveData<StoriesResponse> = storiesList
+class HomeViewModel(private val repository: UserRepository) : ViewModel() {
 
     private val errorStatus = MutableLiveData<String>()
     val error: LiveData<String> = errorStatus
 
-    fun fetchStories(token: String) {
-        viewModelScope.launch {
-            try {
-                val response = repository.getStories(token)
-                storiesList.value = response
-            } catch (e: Exception) {
-                errorStatus.value = e.localizedMessage ?: "An unknown error occurred"
-            }
-        }
+    fun getStories(token: String): Flow<PagingData<DataStory>> {
+        return repository.getStoriesPaging(token).cachedIn(viewModelScope)
     }
 }
